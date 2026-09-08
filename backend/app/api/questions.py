@@ -18,6 +18,25 @@ async def get_questions(
     return questions
 
 
+# Category endpoints (must be before /{question_id} to avoid conflicts)
+@router.get("/categories", response_model=List[CategoryResponse])
+async def get_categories(db: AsyncSession = Depends(get_db)):
+    return await CategoryService.get_all(db)
+
+
+@router.post("/categories", response_model=CategoryResponse, status_code=201)
+async def create_category(category: CategoryCreate, db: AsyncSession = Depends(get_db)):
+    return await CategoryService.create(db, category)
+
+
+@router.delete("/categories/{category_id}")
+async def delete_category(category_id: int, db: AsyncSession = Depends(get_db)):
+    success = await CategoryService.delete(db, category_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
+    return {"message": "Категория успешно удалена"}
+
+
 @router.get("/{question_id}", response_model=QuestionResponse)
 async def get_question(question_id: int, db: AsyncSession = Depends(get_db)):
     question = await QuestionService.get_by_id(db, question_id)
@@ -45,22 +64,3 @@ async def delete_question(question_id: int, db: AsyncSession = Depends(get_db)):
     if not success:
         raise HTTPException(status_code=404, detail="Вопрос не найден")
     return {"message": "Вопрос успешно удален"}
-
-
-# Category endpoints
-@router.get("/categories", response_model=List[CategoryResponse])
-async def get_categories(db: AsyncSession = Depends(get_db)):
-    return await CategoryService.get_all(db)
-
-
-@router.post("/categories", response_model=CategoryResponse, status_code=201)
-async def create_category(category: CategoryCreate, db: AsyncSession = Depends(get_db)):
-    return await CategoryService.create(db, category)
-
-
-@router.delete("/categories/{category_id}")
-async def delete_category(category_id: int, db: AsyncSession = Depends(get_db)):
-    success = await CategoryService.delete(db, category_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Категория не найдена")
-    return {"message": "Категория успешно удалена"}
