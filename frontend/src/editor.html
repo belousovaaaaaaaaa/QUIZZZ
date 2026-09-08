@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактор вопросов - Викторина</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f4f8; color: #333; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; color: #1e40af; margin-bottom: 30px; }
+        
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab { padding: 12px 24px; background: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; transition: all 0.3s; }
+        .tab:hover { background: #dbeafe; }
+        .tab.active { background: #2563eb; color: white; }
+        
+        .panel { display: none; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .panel.active { display: block; }
+        
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: #1e40af; }
+        input[type="text"], textarea, select { width: 100%; padding: 12px; border: 2px solid #cbd5e1; border-radius: 8px; font-size: 16px; }
+        input:focus, textarea:focus, select:focus { outline: none; border-color: #2563eb; }
+        textarea { min-height: 100px; resize: vertical; }
+        
+        .options-container { margin: 20px 0; }
+        .option-item { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+        .option-item input { flex: 1; }
+        .option-item input[type="checkbox"] { width: 20px; height: 20px; }
+        
+        button { padding: 12px 24px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; transition: all 0.3s; }
+        button:hover { background: #1d4ed8; }
+        button.secondary { background: #6b7280; }
+        button.secondary:hover { background: #4b5563; }
+        button.danger { background: #dc2626; }
+        button.danger:hover { background: #b91c1c; }
+        button.success { background: #16a34a; }
+        button.success:hover { background: #15803d; }
+        
+        .questions-list { margin-top: 20px; }
+        .question-card { background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #2563eb; }
+        .question-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .question-card-text { font-size: 18px; font-weight: 600; color: #1e40af; }
+        .question-card-meta { font-size: 14px; color: #6b7280; margin-bottom: 10px; }
+        .question-card-actions { display: flex; gap: 10px; }
+        
+        .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .badge-easy { background: #dcfce7; color: #166534; }
+        .badge-medium { background: #fef3c7; color: #92400e; }
+        .badge-hard { background: #fee2e2; color: #991b1b; }
+        
+        .hidden { display: none !important; }
+        
+        #notification { position: fixed; top: 20px; right: 20px; padding: 15px 25px; background: #16a34a; color: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transform: translateX(150%); transition: transform 0.3s; z-index: 1000; }
+        #notification.show { transform: translateX(0); }
+        #notification.error { background: #dc2626; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📝 Редактор вопросов</h1>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="showPanel('create')">Создать вопрос</button>
+            <button class="tab" onclick="showPanel('list')">Список вопросов</button>
+            <button class="tab" onclick="showPanel('categories')">Категории</button>
+        </div>
+        
+        <!-- Панель создания вопроса -->
+        <div id="create-panel" class="panel active">
+            <h2 style="margin-bottom: 20px;">Новый вопрос</h2>
+            <form id="question-form">
+                <div class="form-group">
+                    <label for="question-text">Текст вопроса *</label>
+                    <textarea id="question-text" required placeholder="Введите текст вопроса"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="question-type">Тип вопроса *</label>
+                    <select id="question-type" onchange="updateOptionsForm()">
+                        <option value="single">Один правильный ответ</option>
+                        <option value="multiple">Несколько правильных ответов</option>
+                        <option value="text">Текстовый ответ</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" id="options-section">
+                    <label>Варианты ответов</label>
+                    <div class="options-container" id="options-list">
+                        <div class="option-item">
+                            <input type="checkbox" name="correct-option" title="Правильный ответ">
+                            <input type="text" class="option-input" placeholder="Вариант ответа">
+                            <button type="button" class="danger" onclick="removeOption(this)">✕</button>
+                        </div>
+                    </div>
+                    <button type="button" class="secondary" onclick="addOption()">+ Добавить вариант</button>
+                </div>
+                
+                <div class="form-group" id="text-answer-section" style="display: none;">
+                    <label for="text-correct-answer">Правильный ответ *</label>
+                    <input type="text" id="text-correct-answer" placeholder="Введите правильный ответ">
+                </div>
+                
+                <div class="form-group">
+                    <label for="question-difficulty">Сложность</label>
+                    <select id="question-difficulty">
+                        <option value="easy">Лёгкий</option>
+                        <option value="medium" selected>Средний</option>
+                        <option value="hard">Сложный</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="question-category">Категория</label>
+                    <select id="question-category">
+                        <option value="">Без категории</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="question-explanation">Пояснение (необязательно)</label>
+                    <textarea id="question-explanation" placeholder="Пояснение к правильному ответу"></textarea>
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="success">💾 Сохранить вопрос</button>
+                    <button type="reset" class="secondary">🔄 Очистить форму</button>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Панель списка вопросов -->
+        <div id="list-panel" class="panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>Все вопросы</h2>
+                <button onclick="loadQuestions()">🔄 Обновить</button>
+            </div>
+            <div id="questions-list" class="questions-list"></div>
+        </div>
+        
+        <!-- Панель категорий -->
+        <div id="categories-panel" class="panel">
+            <h2 style="margin-bottom: 20px;">Управление категориями</h2>
+            <form id="category-form" style="margin-bottom: 30px;">
+                <div class="form-group">
+                    <label for="category-name">Название категории *</label>
+                    <input type="text" id="category-name" required placeholder="Введите название категории">
+                </div>
+                <div class="form-group">
+                    <label for="category-description">Описание</label>
+                    <textarea id="category-description" placeholder="Описание категории"></textarea>
+                </div>
+                <button type="submit" class="success">➕ Создать категорию</button>
+            </form>
+            
+            <h3 style="margin-bottom: 15px;">Существующие категории</h3>
+            <div id="categories-list" class="questions-list"></div>
+        </div>
+    </div>
+    
+    <div id="notification"></div>
+
+    <script>
+        const API_URL = window.location.origin + '/api';
+        
+        // Переключение панелей
+        function showPanel(panelName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(panelName + '-panel').classList.add('active');
+            
+            if (panelName === 'list') loadQuestions();
+            if (panelName === 'categories') loadCategories();
+        }
+        
+        // Обновление формы вариантов
+        function updateOptionsForm() {
+            const type = document.getElementById('question-type').value;
+            const optionsSection = document.getElementById('options-section');
+            const textAnswerSection = document.getElementById('text-answer-section');
+            
+            if (type === 'text') {
+                optionsSection.style.display = 'none';
+                textAnswerSection.style.display = 'block';
+            } else {
+                optionsSection.style.display = 'block';
+                textAnswerSection.style.display = 'none';
+            }
+        }
+        
+        // Добавление варианта ответа
+        function addOption() {
+            const container = document.getElementById('options-list');
+            const div = document.createElement('div');
+            div.className = 'option-item';
+            div.innerHTML = `
+                <input type="checkbox" name="correct-option" title="Правильный ответ">
+                <input type="text" class="option-input" placeholder="Вариант ответа">
+                <button type="button" class="danger" onclick="removeOption(this)">✕</button>
+            `;
+            container.appendChild(div);
+        }
+        
+        function removeOption(btn) {
+            btn.parentElement.remove();
+        }
+        
+        // Уведомления
+        function showNotification(message, isError = false) {
+            const notif = document.getElementById('notification');
+            notif.textContent = message;
+            notif.className = isError ? 'error show' : 'show';
+            setTimeout(() => notif.classList.remove('show'), 3000);
+        }
+        
+        // Загрузка категорий
+        async function loadCategories() {
+            try {
+                const res = await fetch(`${API_URL}/questions/categories`);
+                const categories = await res.json();
+                
+                const categorySelect = document.getElementById('question-category');
+                const categoriesList = document.getElementById('categories-list');
+                
+                categorySelect.innerHTML = '<option value="">Без категории</option>';
+                categoriesList.innerHTML = '';
+                
+                categories.forEach(cat => {
+                    categorySelect.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
+                    categoriesList.innerHTML += `
+                        <div class="question-card">
+                            <div class="question-card-header">
+                                <span class="question-card-text">${cat.name}</span>
+                                <button class="danger" onclick="deleteCategory(${cat.id})">🗑️ Удалить</button>
+                            </div>
+                            <div class="question-card-meta">${cat.description || 'Нет описания'}</div>
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+        
+        // Создание категории
+        document.getElementById('category-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                const res = await fetch(`${API_URL}/questions/categories`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: document.getElementById('category-name').value,
+                        description: document.getElementById('category-description').value
+                    })
+                });
+                
+                if (res.ok) {
+                    showNotification('✅ Категория создана!');
+                    document.getElementById('category-form').reset();
+                    loadCategories();
+                } else {
+                    showNotification('❌ Ошибка создания категории', true);
+                }
+            } catch (err) {
+                showNotification('❌ Ошибка: ' + err.message, true);
+            }
+        });
+        
+        // Удаление категории
+        async function deleteCategory(id) {
+            if (!confirm('Вы уверены?')) return;
+            try {
+                const res = await fetch(`${API_URL}/questions/categories/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    showNotification('✅ Категория удалена!');
+                    loadCategories();
+                }
+            } catch (err) {
+                showNotification('❌ Ошибка удаления', true);
+            }
+        }
+        
+        // Загрузка вопросов
+        async function loadQuestions() {
+            try {
+                const res = await fetch(`${API_URL}/questions`);
+                const questions = await res.json();
+                const list = document.getElementById('questions-list');
+                list.innerHTML = '';
+                
+                questions.forEach(q => {
+                    const badgeClass = `badge-${q.difficulty}`;
+                    const difficultyLabel = q.difficulty === 'easy' ? 'Лёгкий' : q.difficulty === 'medium' ? 'Средний' : 'Сложный';
+                    
+                    list.innerHTML += `
+                        <div class="question-card">
+                            <div class="question-card-header">
+                                <span class="question-card-text">${q.text}</span>
+                                <div style="display:flex;gap:10px;">
+                                    <button onclick="editQuestion(${q.id})">✏️</button>
+                                    <button class="danger" onclick="deleteQuestion(${q.id})">🗑️</button>
+                                </div>
+                            </div>
+                            <div class="question-card-meta">
+                                <span class="badge ${badgeClass}">${difficultyLabel}</span>
+                                Тип: ${q.question_type === 'single' ? 'Один ответ' : q.question_type === 'multiple' ? 'Несколько ответов' : 'Текстовый'}
+                                ${q.category ? `| Категория: ${q.category.name}` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                showNotification('❌ Ошибка загрузки вопросов', true);
+            }
+        }
+        
+        // Создание вопроса
+        document.getElementById('question-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const type = document.getElementById('question-type').value;
+            let correctAnswer;
+            let options = [];
+            
+            if (type === 'text') {
+                correctAnswer = document.getElementById('text-correct-answer').value.trim();
+                if (!correctAnswer) {
+                    showNotification('❌ Введите правильный ответ', true);
+                    return;
+                }
+            } else {
+                const optionInputs = document.querySelectorAll('.option-input');
+                const correctCheckboxes = document.querySelectorAll('input[name="correct-option"]:checked');
+                
+                optionInputs.forEach((input, idx) => {
+                    if (input.value.trim()) {
+                        options.push(input.value.trim());
+                    }
+                });
+                
+                if (options.length < 2) {
+                    showNotification('❌ Добавьте минимум 2 варианта ответа', true);
+                    return;
+                }
+                
+                const correctIndices = Array.from(correctCheckboxes).map(cb => {
+                    const parent = cb.parentElement;
+                    return Array.from(parent.parentElement.children).indexOf(parent);
+                }).filter(idx => idx >= 0);
+                
+                if (correctIndices.length === 0) {
+                    showNotification('❌ Отметьте хотя бы один правильный ответ', true);
+                    return;
+                }
+                
+                correctAnswer = type === 'single' ? correctIndices[0] : correctIndices;
+            }
+            
+            try {
+                const res = await fetch(`${API_URL}/questions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: document.getElementById('question-text').value,
+                        question_type: type,
+                        options: options,
+                        correct_answer: correctAnswer,
+                        difficulty: document.getElementById('question-difficulty').value,
+                        category_id: document.getElementById('question-category').value || null,
+                        explanation: document.getElementById('question-explanation').value || null
+                    })
+                });
+                
+                if (res.ok) {
+                    showNotification('✅ Вопрос создан!');
+                    document.getElementById('question-form').reset();
+                    document.getElementById('options-list').innerHTML = `
+                        <div class="option-item">
+                            <input type="checkbox" name="correct-option" title="Правильный ответ">
+                            <input type="text" class="option-input" placeholder="Вариант ответа">
+                            <button type="button" class="danger" onclick="removeOption(this)">✕</button>
+                        </div>
+                    `;
+                } else {
+                    showNotification('❌ Ошибка создания вопроса', true);
+                }
+            } catch (err) {
+                showNotification('❌ Ошибка: ' + err.message, true);
+            }
+        });
+        
+        // Удаление вопроса
+        async function deleteQuestion(id) {
+            if (!confirm('Вы уверены, что хотите удалить этот вопрос?')) return;
+            try {
+                const res = await fetch(`${API_URL}/questions/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    showNotification('✅ Вопрос удалён!');
+                    loadQuestions();
+                }
+            } catch (err) {
+                showNotification('❌ Ошибка удаления', true);
+            }
+        }
+        
+        // Загрузка при старте
+        loadCategories();
+    </script>
+</body>
+</html>
